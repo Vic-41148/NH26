@@ -277,12 +277,19 @@ npm run dev      # Start on port 5173
 
 </details>
 
----
+-----
+
+## 📄 Project Documentation
+
+> 📑 **[View the SmartDesk Pitch Deck / Proof (PDF) →](https://github.com/Vic-41148/NH26/blob/main/assets/SmartDesk_TeamSpark80-1.pdf)**
+
+-----
+
 
 ## 🎥 Demo Video
 
 <!-- Replace with actual video link -->
-> 📹 **[Watch the full demo →](https://youtu.be/your-video-id)**
+> 📹 **[Watch the full demo →](https://github.com/Vic-41148/NH26/blob/main/assets/2026-03-23%2018-39-26.mkv)**
 >
 > _Covers: User chat → AI detection → Ticket auto-creation → Agent claims → Resolves_
 
