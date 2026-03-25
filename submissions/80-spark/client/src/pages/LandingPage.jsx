@@ -1,16 +1,19 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useGoogleLogin } from '@react-oauth/google'
 import PageShell from '../components/PageShell'
 import Logo from '../components/Logo'
 import ThemeToggle from '../components/ThemeToggle'
 import styles from './LandingPage.module.css'
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 export default function LandingPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const navigate = useNavigate()
 
+  // Guest login
   const handleStart = (e) => {
     e.preventDefault()
     if (!name.trim() || !email.trim()) return
@@ -19,38 +22,63 @@ export default function LandingPage() {
     navigate('/chat')
   }
 
-  const googleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      try {
-        // Fetch user info from Google using the access token
-        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
-        })
-        const profile = await userInfoRes.json()
+  // Google redirect login: step 1 — redirect to Google
+  const handleGoogleLogin = () => {
+    const redirectUri = window.location.origin + '/'
+    const scope = 'openid email profile'
+    const url =
+      `https://accounts.google.com/o/oauth2/v2/auth?` +
+      `client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&response_type=token` +
+      `&scope=${encodeURIComponent(scope)}` +
+      `&prompt=select_account`
+    window.location.href = url
+  }
 
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
-        const res = await fetch(`${apiUrl}/api/auth/google`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: tokenResponse.access_token, profile })
-        })
-        const data = await res.json()
-        if (data.token) {
-          sessionStorage.setItem('token', data.token)
-          sessionStorage.setItem('userName', data.user.name)
-          sessionStorage.setItem('userEmail', data.user.email)
-          sessionStorage.setItem('userAvatar', data.user.avatar || '')
-          navigate('/chat')
-        } else {
-          alert('Login failed: ' + (data.error || 'Unknown error'))
+  // Google redirect login: step 2 — handle the redirect back
+  useEffect(() => {
+    const hash = window.location.hash
+    if (!hash || !hash.includes('access_token')) return
+
+    const params = new URLSearchParams(hash.substring(1))
+    const accessToken = params.get('access_token')
+    if (!accessToken) return
+
+    // Clear hash from URL
+    window.history.replaceState(null, '', window.location.pathname)
+
+      ; (async () => {
+        try {
+          // Fetch profile from Google
+          const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${accessToken}` }
+          })
+          const profile = await userInfoRes.json()
+
+          // Send to our backend
+          const res = await fetch(`${API_URL}/api/auth/google`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: accessToken, profile })
+          })
+          const data = await res.json()
+
+          if (data.token) {
+            sessionStorage.setItem('token', data.token)
+            sessionStorage.setItem('userName', data.user.name)
+            sessionStorage.setItem('userEmail', data.user.email)
+            sessionStorage.setItem('userAvatar', data.user.avatar || '')
+            navigate('/chat')
+          } else {
+            alert('Login failed: ' + (data.error || 'Unknown error'))
+          }
+        } catch (err) {
+          console.error('Google login failed:', err)
+          alert('Network error during Google login.')
         }
-      } catch (err) {
-        console.error('Google login failed:', err)
-        alert('Network error connecting to backend.')
-      }
-    },
-    onError: () => alert('Google sign-in was cancelled or failed.'),
-  })
+      })()
+  }, [])
 
   return (
     <PageShell>
@@ -84,7 +112,7 @@ export default function LandingPage() {
             <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
               <button
                 type="button"
-                onClick={() => googleLogin()}
+                onClick={handleGoogleLogin}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '10px',
                   padding: '12px 24px', border: '1px solid #dadce0',
