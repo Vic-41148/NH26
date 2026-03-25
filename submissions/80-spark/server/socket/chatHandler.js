@@ -88,6 +88,20 @@ module.exports = function chatHandler(io) {
       });
     });
 
+    // ─── User requests to clear chat history ───
+    socket.on('clear_chat_history', async (data) => {
+      const { email } = data;
+      if (email) {
+        console.log(`🧹 Clearing chat history for: ${email}`);
+        await ChatSession.findOneAndUpdate({ userEmail: email }, { $set: { messages: [] } });
+        const session = sessions.get(socket.id);
+        if (session) {
+          session.history = [];
+          session.messageCount = 0;
+        }
+      }
+    });
+
     // ─── User sends a message ───
     // Listen on both 'user_message' (Adi's frontend) and 'send_message' (legacy)
     const handleUserMessage = async (data) => {

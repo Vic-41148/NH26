@@ -34,9 +34,12 @@ export default function LandingPage() {
         sessionStorage.setItem('userEmail', data.user.email)
         sessionStorage.setItem('userAvatar', data.user.avatar || '')
         navigate('/chat')
+      } else {
+        alert('Backend rejected Google token: ' + (data.error || 'Unknown error. Check if GOOGLE_CLIENT_ID matches in server/.env'))
       }
     } catch (err) {
       console.error('Google login failed:', err)
+      alert('Network error connecting to backend auth route.')
     }
   }
 
@@ -72,7 +75,7 @@ export default function LandingPage() {
             <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
               <GoogleLogin
                 onSuccess={handleGoogleSuccess}
-                onError={() => console.log('Google login error')}
+                onError={() => alert('Google returned an error. Check VITE_GOOGLE_CLIENT_ID in .env')}
                 useOneTap
               />
             </div>

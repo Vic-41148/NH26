@@ -11,17 +11,7 @@ const chatSessionSchema = new mongoose.Schema({
     role: { type: String, enum: ['user', 'bot', 'agent', 'system'] },
     content: { type: String },
     timestamp: { type: Date, default: Date.now }
-  }],
-  lastActive: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-// Update lastActive before save
-chatSessionSchema.pre('save', function(next) {
-  this.lastActive = new Date();
-  next();
-});
+  }]
+}, { timestamps: true });
 
 module.exports = mongoose.model('ChatSession', chatSessionSchema);

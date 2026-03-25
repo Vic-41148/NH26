@@ -113,7 +113,17 @@ export default function ChatPage() {
     socketRef.current?.emit('user_message', { message: 'I want to talk to a human agent', forceEscalate: true })
   }
 
-  const resetChat = () => { sessionStorage.clear(); navigate('/') }
+  const resetChat = () => {
+    if (socketRef.current) {
+      socketRef.current.emit('clear_chat_history', { email });
+    }
+    setMessages([{ role: 'bot', text: `Hi ${name}! 👋 I'm the SmartDesk AI assistant. How can I help you today?`, time: new Date() }]);
+    setTicket(null);
+    setCurrentSeverity(null);
+    setCurrentCategory(null);
+    setCurrentEmotion(null);
+    setSuggestions(['I have a billing issue', 'Technical problem', 'Account help']);
+  }
 
   // Sentiment
   const sentimentPct = Math.round(sentimentScore * 100)
