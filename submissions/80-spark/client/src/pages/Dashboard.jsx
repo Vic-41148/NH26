@@ -325,6 +325,7 @@ export default function Dashboard() {
             ticket={selectedTicket}
             onClose={() => setSelectedTicket(null)}
             onUpdate={handleUpdate}
+            socket={socketRef.current}
           />
         )}
       </div>

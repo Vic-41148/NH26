@@ -32,9 +32,11 @@ app.set('io', io);
 // API Routes
 const agentRoutes = require('./routes/agentRoutes');
 const ticketRoutes = require('./routes/ticketRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 app.use('/api/agents', agentRoutes);
 app.use('/api/tickets', ticketRoutes);
+app.use('/api/auth', authRoutes);
 
 // Health check
 app.get('/', (req, res) => {

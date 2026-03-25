@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { GoogleLogin } from '@react-oauth/google'
 import PageShell from '../components/PageShell'
 import Logo from '../components/Logo'
 import ThemeToggle from '../components/ThemeToggle'
@@ -16,6 +17,27 @@ export default function LandingPage() {
     sessionStorage.setItem('userName', name.trim())
     sessionStorage.setItem('userEmail', email.trim())
     navigate('/chat')
+  }
+
+  const handleGoogleSuccess = async (response) => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${apiUrl}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: response.credential })
+      })
+      const data = await res.json()
+      if (data.token) {
+        sessionStorage.setItem('token', data.token)
+        sessionStorage.setItem('userName', data.user.name)
+        sessionStorage.setItem('userEmail', data.user.email)
+        sessionStorage.setItem('userAvatar', data.user.avatar || '')
+        navigate('/chat')
+      }
+    } catch (err) {
+      console.error('Google login failed:', err)
+    }
   }
 
   return (
@@ -45,7 +67,17 @@ export default function LandingPage() {
 
           <div className={styles.card}>
             <p className={styles.cardTitle}>Get started</p>
-            <p className={styles.cardSub}>Tell us who you are and we'll connect you.</p>
+            <p className={styles.cardSub}>Sign in with Google or continue as a guest.</p>
+
+            <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => console.log('Google login error')}
+                useOneTap
+              />
+            </div>
+
+            <div className={styles.divider}>or continue manually</div>
 
             <form onSubmit={handleStart} className={styles.form}>
               <div>
@@ -70,7 +102,7 @@ export default function LandingPage() {
                   required
                 />
               </div>
-              <button type="submit" className={styles.submitBtn}>Start Chat</button>
+              <button type="submit" className={styles.submitBtn}>Start Guest Chat</button>
             </form>
 
             <div className={styles.divider}>or</div>
@@ -83,10 +115,10 @@ export default function LandingPage() {
 
       <div className={styles.features}>
         {[
-          { icon: <BoltIcon />,    label: 'Instant AI responses' },
-          { icon: <ShieldIcon />,  label: 'Security detection' },
-          { icon: <TargetIcon />,  label: 'Smart escalation' },
-          { icon: <ChartIcon />,   label: 'Live agent dashboard' },
+          { icon: <BoltIcon />, label: 'Instant AI responses' },
+          { icon: <ShieldIcon />, label: 'Security detection' },
+          { icon: <TargetIcon />, label: 'Smart escalation' },
+          { icon: <ChartIcon />, label: 'Live agent dashboard' },
         ].map((f) => (
           <div key={f.label} className={styles.feature}>
             <span className={styles.featureIcon}>{f.icon}</span>
@@ -102,31 +134,31 @@ export default function LandingPage() {
 function BoltIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-      <path d="M8 1L3 8h4l-1 5 6-7H8L8 1z" stroke="#60a5fa" strokeWidth="1.4" strokeLinejoin="round" fill="none"/>
+      <path d="M8 1L3 8h4l-1 5 6-7H8L8 1z" stroke="#60a5fa" strokeWidth="1.4" strokeLinejoin="round" fill="none" />
     </svg>
   )
 }
 function ShieldIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-      <path d="M7 1.5L2 3.5v4c0 2.5 2.2 4.5 5 5 2.8-.5 5-2.5 5-5v-4L7 1.5z" stroke="#818cf8" strokeWidth="1.4" strokeLinejoin="round" fill="none"/>
+      <path d="M7 1.5L2 3.5v4c0 2.5 2.2 4.5 5 5 2.8-.5 5-2.5 5-5v-4L7 1.5z" stroke="#818cf8" strokeWidth="1.4" strokeLinejoin="round" fill="none" />
     </svg>
   )
 }
 function TargetIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-      <circle cx="7" cy="7" r="5.5" stroke="#34d399" strokeWidth="1.4" fill="none"/>
-      <circle cx="7" cy="7" r="2.5" stroke="#34d399" strokeWidth="1.4" fill="none"/>
+      <circle cx="7" cy="7" r="5.5" stroke="#34d399" strokeWidth="1.4" fill="none" />
+      <circle cx="7" cy="7" r="2.5" stroke="#34d399" strokeWidth="1.4" fill="none" />
     </svg>
   )
 }
 function ChartIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-      <rect x="1.5" y="7" width="2.5" height="5.5" rx="1" fill="#f472b6"/>
-      <rect x="5.75" y="4" width="2.5" height="8.5" rx="1" fill="#f472b6"/>
-      <rect x="10" y="1.5" width="2.5" height="11" rx="1" fill="#f472b6"/>
+      <rect x="1.5" y="7" width="2.5" height="5.5" rx="1" fill="#f472b6" />
+      <rect x="5.75" y="4" width="2.5" height="8.5" rx="1" fill="#f472b6" />
+      <rect x="10" y="1.5" width="2.5" height="11" rx="1" fill="#f472b6" />
     </svg>
   )
 }

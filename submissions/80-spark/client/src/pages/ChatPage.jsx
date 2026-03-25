@@ -49,6 +49,16 @@ export default function ChatPage() {
     })
     socket.on('disconnect', () => setConnected(false))
 
+    socket.on('chat_history', (data) => {
+      if (data.messages && data.messages.length > 0) {
+        setMessages(data.messages.map(m => ({
+          role: m.role === 'bot' ? 'bot' : m.role === 'agent' ? 'agent' : 'user',
+          text: m.message || m.content,
+          time: new Date(m.timestamp)
+        })))
+      }
+    })
+
     socket.on('welcome', (data) => {
       setMessages([{ role: 'bot', text: data.message, time: new Date() }])
       setSuggestions(['I have a billing issue', 'Technical problem', 'Account help'])
@@ -64,7 +74,7 @@ export default function ChatPage() {
       else setSuggestions([])
 
       setMessages((prev) => [...prev, {
-        role: 'bot', text: data.message,
+        role: data.role || 'bot', text: data.message,
         severity: data.severity, category: data.category, time: new Date(),
       }])
     })
@@ -184,6 +194,7 @@ export default function ChatPage() {
 
               return (
                 <div key={i} className={`${styles.bubble} ${msg.role === 'user' ? styles.userBubble : styles.botBubble}`}>
+                  {msg.role === 'agent' && <div style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: '6px', fontWeight: 600 }}>👩‍💼 Agent Reply</div>}
                   {msg.text}
                   <div className={styles.bubbleMeta}>
                     {msg.severity && <span className={`badge ${sevBadge[msg.severity]}`}>{msg.severity}</span>}

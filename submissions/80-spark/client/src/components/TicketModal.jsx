@@ -11,11 +11,12 @@ const STATUS_FLOW = [
   { value: 'resolved', label: 'Resolved', icon: '✅' },
 ]
 
-export default function TicketModal({ ticket, onClose, onUpdate }) {
+export default function TicketModal({ ticket, onClose, onUpdate, socket }) {
   const [status, setStatus] = useState(ticket.status)
   const [notes, setNotes] = useState(ticket.resolutionNotes || '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [replyMessage, setReplyMessage] = useState('')
 
   const handleSave = async () => {
     setSaving(true)
@@ -23,6 +24,16 @@ export default function TicketModal({ ticket, onClose, onUpdate }) {
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  const handleSendReply = () => {
+    if (!replyMessage.trim() || !socket) return
+    socket.emit('agent_direct_message', {
+      userEmail: ticket.userEmail,
+      message: replyMessage,
+      ticketId: ticket.ticketId
+    })
+    setReplyMessage('')
   }
 
   const handleBackdrop = (e) => {
@@ -81,7 +92,7 @@ export default function TicketModal({ ticket, onClose, onUpdate }) {
               {ticket.transcript?.length > 0 ? (
                 ticket.transcript.map((msg, i) => (
                   <div key={i} className={`${styles.msg} ${msg.role === 'user' ? styles.userMsg : styles.botMsg}`}>
-                    <span className={styles.msgRole}>{msg.role === 'user' ? (ticket.userName || 'User') : '⚡ SmartDesk AI'}</span>
+                    <span className={styles.msgRole}>{msg.role === 'user' ? (ticket.userName || 'User') : msg.role === 'agent' ? '👩‍💼 Human Agent' : '⚡ SmartDesk AI'}</span>
                     <span className={styles.msgText}>{msg.content || msg.text || msg.message}</span>
                     {msg.timestamp && (
                       <span className={styles.msgTime}>{format(new Date(msg.timestamp), 'HH:mm')}</span>
@@ -111,8 +122,31 @@ export default function TicketModal({ ticket, onClose, onUpdate }) {
             </div>
           </div>
 
-          {/* Notes */}
+          {/* Direct Reply */}
           <div>
+            <div className={styles.sectionTitle}>Direct Reply</div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                className={styles.notesArea}
+                style={{ flex: 1, padding: '10px', height: 'auto', marginBottom: 0 }}
+                placeholder={`Message ${ticket.userName}...`}
+                value={replyMessage}
+                onChange={(e) => setReplyMessage(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSendReply() }}
+              />
+              <button
+                className={styles.saveBtn}
+                style={{ width: 'auto', padding: '0 20px', marginTop: 0 }}
+                onClick={handleSendReply}
+                disabled={!replyMessage.trim()}
+              >
+                Send
+              </button>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div style={{ marginTop: '1.5rem' }}>
             <div className={styles.sectionTitle}>Resolution Notes</div>
             <textarea
               className={styles.notesArea}

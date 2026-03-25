@@ -2,8 +2,9 @@ const { processMessage } = require('../services/aiEngine');
 const { matchFAQ } = require('../services/faqMatcher');
 const { classifyFallback } = require('../services/fallback');
 const Ticket = require('../models/Ticket');
+const ChatSession = require('../models/ChatSession');
 
-// Store active chat sessions: socketId -> { name, email, history[], messageCount }
+// Store active chat sessions: socketId -> { name, email, history[], messageCount, sessionId }
 const sessions = new Map();
 
 // Rate limiting: track last message time per socket
@@ -15,26 +16,76 @@ module.exports = function chatHandler(io) {
     console.log(`🔌 Socket connected: ${socket.id}`);
 
     // ─── User joins chat ───
-    socket.on('user_join', (data) => {
+    socket.on('user_join', async (data) => {
       const { name, email } = data;
+
+      let sessionDoc;
+      if (email && email !== 'no-email') {
+        socket.join(`user_${email}`);
+        sessionDoc = await ChatSession.findOne({ userEmail: email });
+        if (!sessionDoc) {
+          sessionDoc = await ChatSession.create({ userEmail: email, messages: [] });
+        }
+      }
+
       sessions.set(socket.id, {
         name: name || 'Anonymous',
         email: email || 'no-email',
-        history: [],
-        messageCount: 0
+        history: sessionDoc ? sessionDoc.messages.map(m => ({ role: m.role, message: m.content, content: m.content })) : [],
+        messageCount: 0,
+        sessionId: sessionDoc ? sessionDoc._id : null
       });
       console.log(`👤 User joined: ${name} (${email})`);
 
-      // Send welcome message (Adi's frontend listens for 'welcome')
-      socket.emit('welcome', {
-        message: `Hi ${name}! 👋 I'm the SmartDesk AI assistant. How can I help you today?`
-      });
+      if (sessionDoc && sessionDoc.messages.length > 0) {
+        socket.emit('chat_history', { messages: sessionDoc.messages });
+      } else {
+        socket.emit('welcome', {
+          message: `Hi ${name}! 👋 I'm the SmartDesk AI assistant. How can I help you today?`
+        });
+      }
     });
 
     // ─── Agent joins dashboard room ───
     socket.on('agent_join', () => {
       socket.join('agents');
       console.log(`🛡️ Agent connected to dashboard: ${socket.id}`);
+    });
+
+    // ─── Agent sends direct message to User ───
+    socket.on('agent_direct_message', async (data) => {
+      const { userEmail, message, ticketId } = data;
+      if (!userEmail || !message) return;
+
+      console.log(`💬 Agent direct message to user ${userEmail}: ${message}`);
+
+      // Save to chat session if exists
+      const sessionDoc = await ChatSession.findOne({ userEmail });
+      if (sessionDoc) {
+        sessionDoc.messages.push({ role: 'agent', content: message, timestamp: new Date() });
+        await sessionDoc.save();
+      }
+
+      // Also append to active ticket transcript if ticketId is provided
+      if (ticketId) {
+        const ticket = await Ticket.findOne({ ticketId });
+        if (ticket) {
+          ticket.transcript.push({ role: 'agent', content: message, message });
+          await ticket.save();
+          // Update all agents about the ticket change (they listen to ticket_updated maybe)
+          io.to('agents').emit('ticket_updated', ticket);
+        }
+      }
+
+      // Emit directly to the user's personal room
+      io.to(`user_${userEmail}`).emit('bot_message', {
+        message: message,
+        role: 'agent',
+        category: 'General',
+        severity: 'Low',
+        resolved: false,
+        suggestedReplies: []
+      });
     });
 
     // ─── User sends a message ───
@@ -68,6 +119,12 @@ module.exports = function chatHandler(io) {
         content: message.trim(), // Adi's frontend uses 'content'
         timestamp: new Date()
       });
+
+      if (session.sessionId) {
+        await ChatSession.findByIdAndUpdate(session.sessionId, {
+          $push: { messages: { role: 'user', content: message.trim(), timestamp: new Date() } }
+        });
+      }
 
       try {
         // ─── STEP 1: Check FAQ first (instant resolution) ───
@@ -116,6 +173,12 @@ module.exports = function chatHandler(io) {
           content: aiResult.response,
           timestamp: new Date()
         });
+
+        if (session.sessionId) {
+          await ChatSession.findByIdAndUpdate(session.sessionId, {
+            $push: { messages: { role: 'bot', content: aiResult.response, timestamp: new Date() } }
+          });
+        }
 
         // Send AI response to user
         socket.emit('bot_message', {

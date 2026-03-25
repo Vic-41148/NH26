@@ -164,7 +164,15 @@ async function callGroq(userMessage, conversationHistory) {
     new Promise((_, reject) => setTimeout(() => reject(new Error('Groq timeout')), 10000))
   ]);
 
-  return parseAIResponse(completion.choices[0].message.content);
+  try {
+    const content = completion.choices[0].message.content;
+    return parseAIResponse(content);
+  } catch (err) {
+    if (completion && completion.choices && completion.choices[0]) {
+      err.rawOutput = completion.choices[0].message.content;
+    }
+    throw err;
+  }
 }
 
 // ── Gemini API call ────────────────────────────────────────────────────────
@@ -194,6 +202,8 @@ async function callGemini(userMessage, conversationHistory) {
 
 // ── Main entry point: Groq → Gemini → Fallback ────────────────────────────
 async function processMessage(userMessage, conversationHistory = []) {
+  let groqFailedOutput = null;
+
   // Try Groq first (fastest, free)
   if (groqClient) {
     try {
@@ -202,13 +212,22 @@ async function processMessage(userMessage, conversationHistory = []) {
       return result;
     } catch (error) {
       console.warn('⚠️ Groq failed:', error.message);
+      if (error.rawOutput) {
+        groqFailedOutput = error.rawOutput;
+      }
     }
   }
 
   // Try Gemini second
   if (geminiModel) {
     try {
-      const result = await callGemini(userMessage, conversationHistory);
+      let messageForGemini = userMessage;
+      if (groqFailedOutput) {
+        console.log('🔄 Tunneling Groq fallback output to Gemini...');
+        messageForGemini = `Original user message: "${userMessage}"\n\nA previous attempt to generate a response resulted in an invalid format. Please fix and format the following raw output into the CORRECT JSON schema:\n\nRAW OUTPUT:\n${groqFailedOutput}`;
+      }
+
+      const result = await callGemini(messageForGemini, conversationHistory);
       console.log('🧠 [Gemini] AI response received');
       return result;
     } catch (error) {
