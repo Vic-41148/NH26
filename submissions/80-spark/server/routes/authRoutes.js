@@ -9,15 +9,21 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecretfallbackkeyforhackathon
 
 router.post('/google', async (req, res) => {
     try {
-        const { token } = req.body;
-        if (!token) return res.status(400).json({ error: 'Token is required' });
+        const { token, profile } = req.body;
+        if (!token && !profile) return res.status(400).json({ error: 'Token or profile is required' });
 
         let payload;
 
         try {
-            // Very basic mock fallback if client ID isn't set, useful for running without config
-            if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID === 'MOCK_CLIENT_ID') {
-                // If testing with a mock token that just contains the JSON info encoded simply
+            if (profile && profile.email) {
+                // useGoogleLogin flow: profile already fetched from Google userinfo API
+                payload = {
+                    sub: profile.sub,
+                    email: profile.email,
+                    name: profile.name,
+                    picture: profile.picture
+                };
+            } else if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID === 'MOCK_CLIENT_ID') {
                 const decoded = jwt.decode(token);
                 if (!decoded || !decoded.email) throw new Error('Invalid mock token');
                 payload = decoded;
